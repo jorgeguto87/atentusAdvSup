@@ -12,6 +12,14 @@ const cors = require('cors');
 const { createClient } = require('@supabase/supabase-js');
 
 const app = express();
+// Servir arquivos estáticos da pasta 'public'
+app.use(express.static(path.join(__dirname, 'public')));
+
+// Redirecionar rota raiz para index.html
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
 const PORT = 5030;
 
 const supabase = createClient('https://asoxpubkhrqoumcdizcp.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFzb3hwdWJraHJxb3VtY2RpemNwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA4OTI3ODQsImV4cCI6MjA2NjQ2ODc4NH0.-RUTRABZMLa4HBWpu_20rILzbMxdZj3Kn6Jkmh5b7Zw');

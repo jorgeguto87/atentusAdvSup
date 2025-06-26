@@ -1,360 +1,51 @@
-let usuarioLogado = false;
-let sessionToken = null;
+async function realizarLogin(email, password) {
+  try {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password
+    });
 
-// Páginas que não requerem login
-const paginasPublicas = ['login', 'cadastro'];
+    if (error) {
+      return { sucesso: false, mensagem: 'Credenciais inválidas' };
+    }
 
+    sessionStorage.setItem('usuarioLogado', 'true');
+    sessionStorage.setItem('sessionToken', data.session.access_token);
+    sessionStorage.setItem('loginUsuario', email);
+    sessionStorage.setItem('userId', data.user.id);
 
-
-// Função para verificar se o usuário está logado
-function verificarAutenticacao() {
-  // Verifica se existe um token de sessão válido
-  const token = sessionStorage.getItem('sessionToken');
-  const loginStatus = sessionStorage.getItem('usuarioLogado');
-  
-  if (token && loginStatus === 'true') {
     usuarioLogado = true;
-    sessionToken = token;
-    return true;
+    sessionToken = data.session.access_token;
+
+    atualizarInterfaceLogin();
+    return { sucesso: true, mensagem: 'Login realizado com sucesso' };
+  } catch (err) {
+    console.error(err);
+    return { sucesso: false, mensagem: 'Erro ao conectar com o Supabase' };
   }
-  return false;
 }
 
-// Função para fazer login (agora usando API)
-async function realizarLogin(username, password) {
+async function realizarCadastroUsuario(email, password) {
   try {
-    const response = await fetch('https://atentus.com.br:5030/login', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        login: username,
-        senha: password
-      })
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password
     });
-    
-    const resultado = await response.json();
-    
-    if (resultado.sucesso) {
-      usuarioLogado = true;
-      sessionToken = resultado.token;
-      
-      // Salvar estado de login na sessão
-      sessionStorage.setItem('usuarioLogado', 'true');
-      sessionStorage.setItem('sessionToken', sessionToken);
-      sessionStorage.setItem('loginUsuario', username);
-      
-      // Mostrar/esconder elementos baseado no login
-      atualizarInterfaceLogin();
-      
-      return { sucesso: true, mensagem: resultado.mensagem };
-    } else {
-      return { sucesso: false, mensagem: resultado.mensagem };
-    }
-    
-  } catch (error) {
-    console.error('Erro no login:', error);
-    return { sucesso: false, mensagem: 'Erro de conexão com o servidor' };
-  }
-}
 
-// Função para cadastrar usuário (agora usando API)
-async function realizarCadastroUsuario(login, senha) {
-  try {
-    const response = await fetch('https://atentus.com.br:5030/cadastrar', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        login: login,
-        senha: senha
-      })
-    });
-    
-    const resultado = await response.json();
-    
-    console.log('Resposta do servidor:', resultado);
-    
+    if (error) {
+      return { sucesso: false, mensagem: error.message };
+    }
+
     return {
-      sucesso: resultado.sucesso,
-      mensagem: resultado.mensagem
+      sucesso: true,
+      mensagem: 'Cadastro realizado! Verifique seu e-mail.'
     };
-    
-  } catch (error) {
-    console.error('Erro no cadastro:', error);
-    return {
-      sucesso: false,
-      mensagem: 'Erro de conexão com o servidor'
-    };
+  } catch (err) {
+    console.error(err);
+    return { sucesso: false, mensagem: 'Erro ao cadastrar usuário' };
   }
 }
 
-// Função para fazer logout
-function realizarLogout() {
-  usuarioLogado = false;
-  sessionToken = null;
-  
-  // Limpar dados da sessão
-  sessionStorage.removeItem('usuarioLogado');
-  sessionStorage.removeItem('sessionToken');
-  sessionStorage.removeItem('loginUsuario');
-  
-  // Atualizar interface
-  atualizarInterfaceLogin();
-  
-  // Redirecionar para login
-  carregarPagina('login');
-}
-
-// Função para atualizar a interface baseada no status de login
-function atualizarInterfaceLogin() {
-  const navLinks = document.querySelectorAll('[data-page]');
-  
-  navLinks.forEach(link => {
-    const pagina = link.getAttribute('data-page');
-    
-    if (!paginasPublicas.includes(pagina)) {
-      if (usuarioLogado) {
-        link.style.display = 'block';
-        link.style.pointerEvents = 'auto';
-        link.style.opacity = '1';
-      } else {
-        link.style.display = 'none';
-      }
-    }
-  });
-  
-  // Mostrar nome do usuário logado se houver elemento para isso
-  const userDisplay = document.getElementById('usuarioLogado');
-  if (userDisplay) {
-    const nomeUsuario = sessionStorage.getItem('loginUsuario');
-    if (usuarioLogado && nomeUsuario) {
-      userDisplay.textContent = `Bem-vindo, ${nomeUsuario}!`;
-      userDisplay.style.display = 'block';
-    } else {
-      userDisplay.style.display = 'none';
-    }
-  }
-}
-
-function carregarPagina(pagina) {
-  // Verificar se a página requer autenticação
-  if (!paginasPublicas.includes(pagina) && !verificarAutenticacao()) {
-    alert('Você precisa fazer login para acessar esta página!');
-    carregarPagina('login');
-    return;
-  }
-  
-  // Debug: verificar se o arquivo existe
-  console.log(`Tentando carregar: pages/${pagina}.html`);
-  
-  fetch(`https://atentus.com.br:5030/pages/${pagina}.html`)
-    .then(response => {
-      if (!response.ok) {
-        throw new Error(`Arquivo não encontrado: pages/${pagina}.html (${response.status})`);
-      }
-      return response.text();
-    })
-    .then(html => {
-      const main = document.querySelector('main') || document.getElementById('main');
-      if (main) {
-        main.innerHTML = html;
-      }
-      
-      // Atualizar navegação ativa
-      const activeLinks = document.querySelectorAll('.nav-link.active');
-      activeLinks.forEach(link => link.classList.remove('active'));
-      
-      const currentLink = document.querySelector(`[data-page="${pagina}"]`);
-      if (currentLink) {
-        currentLink.classList.add('active');
-      }
-      
-      // Inicializar funcionalidades específicas da página
-      if (pagina === 'login') {
-        inicializarLogin();
-      } else if (pagina === 'cadastro') {
-        botaoLogin();
-        inicializarElementosPagina();
-        inicializarCadastro();
-      } else {
-        inicializarElementosPagina();
-      }
-      
-      // Atualizar interface baseada no login
-      atualizarInterfaceLogin();
-      
-      console.log(`Página ${pagina} carregada com sucesso`);
-    })
-    .catch((error) => {
-      console.error('Erro detalhado:', error);
-      const main = document.querySelector('main') || document.getElementById('main');
-      if (main) {
-        if (pagina === 'anuncios') {
-          const nomeUsuario = sessionStorage.getItem('loginUsuario') || 'Usuário';
-          main.innerHTML = `
-            <div style="text-align: center; padding: 2rem;">
-              <h2>Bem-vindo, ${nomeUsuario}!</h2>
-              <p>Login realizado com sucesso.</p>
-              <p><small>Arquivo pages/anuncios.html não encontrado.</small></p>
-              <button onclick="realizarLogout()" style="background: #dc3545; color: white; border: none; border-radius: 4px;">
-                Fazer Logout
-              </button>
-            </div>
-          `;
-        } else {
-          main.innerHTML = `
-            <div style="text-align: center; padding: 2rem;">
-              <h2>Erro ao carregar página</h2>
-              <p>Não foi possível carregar: <strong>${pagina}.html</strong></p>
-              <p><small>${error.message}</small></p>
-              <button onclick="carregarPagina('login')">
-                Voltar ao Login
-              </button>
-            </div>
-          `;
-        }
-      }
-    });
-}
-
-// Função para inicializar o cadastro
-function inicializarCadastro() {
-  const btncadastrarUser = document.getElementById('btnCadastrar');
-  const loginCadastro = document.getElementById('loginCadastro');
-  const senhaCadastro = document.getElementById('senhaCadastro');
-  const statusCadastro = document.getElementById('statusCadastro');
-
-  if (btncadastrarUser) {
-    btncadastrarUser.addEventListener('click', async (e) => {
-      e.preventDefault();
-      
-      if (!loginCadastro || !senhaCadastro) {
-        console.error('Elementos de cadastro não encontrados');
-        return;
-      }
-      
-      // Mostrar loading
-      btncadastrarUser.disabled = true;
-      btncadastrarUser.textContent = 'Cadastrando...';
-      
-      if (statusCadastro) {
-        statusCadastro.textContent = 'Processando...';
-        statusCadastro.style.color = 'blue';
-      }
-      
-      const resultado = await realizarCadastroUsuario(
-        loginCadastro.value.trim(), 
-        senhaCadastro.value
-      );
-      
-      // Restaurar botão
-      btncadastrarUser.disabled = false;
-      btncadastrarUser.textContent = 'Cadastrar';
-      
-      if (statusCadastro) {
-        statusCadastro.textContent = resultado.mensagem;
-        statusCadastro.style.color = resultado.sucesso ? 'green' : 'red';
-      }
-      
-      if (resultado.sucesso) {
-        loginCadastro.value = '';
-        senhaCadastro.value = '';
-        
-        // Redirecionar para login após cadastro bem-sucedido
-        setTimeout(() => {
-          carregarPagina('login');
-        }, 1500);
-      }
-    });
-  } else {
-    console.error('Botão de cadastro não encontrado');
-  }
-}
-
-function botaoLogin(){
-  const btnLogin = document.getElementById('linkLogin');
-  if (btnLogin) {
-    btnLogin.addEventListener('click', (e) => {
-      e.preventDefault();
-      carregarPagina('login');
-    });
-  }
-}
-
-function botaoCadastrar(){
-  const btnCadastro = document.getElementById('linkCadastro');
-  if (btnCadastro) {
-    btnCadastro.addEventListener('click', (e) => {
-      e.preventDefault();
-      carregarPagina('cadastro');
-    });
-  }
-}
-
-function inicializarLogin() {
-  const btnEntrar = document.getElementById('btnEntrar');
-  
-  if (btnEntrar) {
-    btnEntrar.addEventListener('click', async (e) => {
-      e.preventDefault();
-      
-      const login = document.getElementById('login');
-      const senha = document.getElementById('senha');
-      const statusLogin = document.getElementById('statusLogin');
-      
-      // Limpar status anterior
-      if (statusLogin) {
-        statusLogin.textContent = '';
-        statusLogin.style.color = '';
-      }
-      
-      if (login && senha) {
-        // Mostrar loading
-        btnEntrar.disabled = true;
-        btnEntrar.textContent = 'Entrando...';
-        
-        if (statusLogin) {
-          statusLogin.textContent = 'Verificando credenciais...';
-          statusLogin.style.color = 'blue';
-        }
-        
-        const resultado = await realizarLogin(login.value.trim(), senha.value);
-        
-        // Restaurar botão
-        btnEntrar.disabled = false;
-        btnEntrar.textContent = 'Entrar';
-        
-        if (resultado.sucesso) {
-          // Login bem-sucedido
-          if (statusLogin) {
-            statusLogin.textContent = resultado.mensagem;
-            statusLogin.style.color = 'green';
-          }
-          
-          // Redirecionar para página principal após login
-          setTimeout(() => {
-            carregarPagina('anuncios');
-          }, 500);
-          
-        } else {
-          // Login falhou
-          if (statusLogin) {
-            statusLogin.textContent = resultado.mensagem;
-            statusLogin.style.color = 'red';
-          }
-          login.value = '';
-          senha.value = '';
-        }
-      }
-    });
-  }
-  
-  // Inicializar botão de cadastro se estiver na página de login
-  botaoCadastrar();
-}
 function inicializarElementosPagina() {
   const button = document.getElementById('emoji-button');
   const picker = document.getElementById('emoji-picker');
@@ -424,130 +115,78 @@ function inicializarElementosPagina() {
   }
 
   const uploadButton = document.getElementById('upload-button');
-  if (uploadButton) {
-    uploadButton.addEventListener('click', async () => {
-      const fileInput = document.getElementById('file-input');
-      const file = fileInput?.files[0];
-      const diaSemana = document.getElementById('diaSemana')?.value;
+if (uploadButton) {
+  uploadButton.addEventListener('click', async () => {
+    const fileInput = document.getElementById('file-input');
+    const file = fileInput?.files[0];
+    const diaSemana = document.getElementById('diaSemana')?.value;
 
-      function exibirStatus(id, texto) {
-        const campo = document.getElementById(id);
-        if (campo) campo.innerHTML = texto;
-      }
+    if (!file) {
+      exibirStatus('status_documents', 'Nenhum arquivo selecionado');
+      return;
+    }
+    if (!userId) {
+      exibirStatus('status_documents', 'Usuário não autenticado');
+      return;
+    }
 
-      if (!file) {
-        exibirStatus('status_documents', 'Nenhum arquivo selecionado');
-        return;
-      }
+    const formData = new FormData();
+    formData.append('arquivo', file);
+    formData.append('diaSemana', diaSemana);
+    formData.append('userId', userId);
 
-      const formData = new FormData();
-      formData.append('arquivo', file);
-      formData.append('diaSemana', diaSemana);
-
-      const response = await fetch('https://atentus.com.br:5030/upload', {
+    try {
+      const res = await fetch('https://atentus.com.br:5030/upload', {
         method: 'POST',
-        body: formData
+        body: formData,
       });
 
-      const data = await response.json();
-      exibirStatus('status_documents', data.message);
-    });
-  }
+      const data = await res.json();
+      exibirStatus('status_documents', data.message || 'Upload realizado');
+    } catch (error) {
+      exibirStatus('status_documents', 'Erro no upload');
+      console.error(error);
+    }
+  });
+}
 
-  const fileInput = document.getElementById('file-input');
-  const imagem = document.getElementById('previewImagem');
-  if (fileInput && imagem) {
-    fileInput.addEventListener('change', () => {
-      const file = fileInput.files[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = () => imagem.src = reader.result;
-        reader.readAsDataURL(file);
-      }
-    });
-  }
+// --- SALVAR MENSAGEM ---
+const campoMensagem = document.getElementById('input_text');
+const uploadText = document.getElementById('upload_text');
+const previewText = document.getElementById('previewText');
 
-  const campoMensagem = document.getElementById('input_text');
-  const uploadText = document.getElementById('upload_text');
-  const previewText = document.getElementById('previewText');
+if (campoMensagem && uploadText && previewText) {
+  uploadText.addEventListener('click', async () => {
+    if (!userId) {
+      exibirStatus('status_text', 'Usuário não autenticado');
+      return;
+    }
+    const diaSemana = document.getElementById('diaSemana')?.value || '';
+    const texto = campoMensagem.value || '';
 
-  if (campoMensagem && uploadText && previewText) {
-    uploadText.addEventListener('click', () => {
-      const semanaMensagem = document.getElementById('diaSemana');
-      let mensagem;
-      if (semanaMensagem) {
-        const valor = semanaMensagem.value;
-        mensagem = valor;
-      }
-      const dados = { mensagemSemana: mensagem, mensagem: campoMensagem.value };
+    const dados = { userId, diaSemana, texto };
 
-      function exibirStatus(id, texto) {
-        const campo = document.getElementById(id);
-        if (campo) campo.textContent = texto;
-      }
-
-      fetch('https://atentus.com.br:5030/salvar', {
+    try {
+      const res = await fetch('https://atentus.com.br:5030/mensagem', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(dados)
-      })
-        .then(res => res.text())
-        .then(() => exibirStatus('status_text', 'Dados salvos com sucesso'))
-        .catch(err => console.error('Erro:', err));
-    });
+        body: JSON.stringify(dados),
+      });
+      const data = await res.json();
+      exibirStatus('status_text', data.message || 'Mensagem salva');
+    } catch (error) {
+      exibirStatus('status_text', 'Erro ao salvar mensagem');
+      console.error(error);
+    }
+  });
 
-    campoMensagem.addEventListener('input', () => {
-      const textoComQuebras = campoMensagem.value.replace(/\n/g, '<br>');
-      previewText.innerHTML = textoComQuebras;
-    });
-    
-  }
+  campoMensagem.addEventListener('input', () => {
+    const textoComQuebras = campoMensagem.value.replace(/\n/g, '<br>');
+    previewText.innerHTML = textoComQuebras;
+  });
+}
 
-  const diaSemanaSelect = document.getElementById('diaSemana');
-  if (diaSemanaSelect) {
-    diaSemanaSelect.addEventListener('change', () => {
-      const statusDocs = document.getElementById('status_documents');
-      const statusText = document.getElementById('status_text');
-      const previewImagem = document.getElementById('previewImagem');
-      const inputText = document.getElementById('input_text');
-      const previewText = document.getElementById('previewText');
-
-      if (statusDocs) statusDocs.innerHTML = '';
-      if (statusText) statusText.innerHTML = '';
-      if (fileInput) fileInput.value = '';
-      if (previewImagem) previewImagem.src = 'default_preview.jpg';
-      if (inputText) inputText.value = '';
-      if (previewText) previewText.innerHTML = '';
-    });
-  }
-  // Gerador de Links do WhatsApp
-  const inputNumero = document.getElementById('input_gen_number');
-  const inputTexto = document.getElementById('input_gen_text');
-  const botaoGerar = document.getElementById('gerar_link');
-  const statusLink = document.getElementById('status_link');
-
-  if (inputNumero && inputTexto && botaoGerar && statusLink) {
-    botaoGerar.addEventListener('click', () => {
-      const numero = inputNumero.value.trim();
-      const texto = inputTexto.value.trim();
-
-      if (!numero || !/^55\d{11}$/.test(numero)) {
-        statusLink.innerText = '❌ Número inválido. Use o formato 55DD9XXXXXXXX.';
-        return;
-      }
-
-      const textoCodificado = encodeURIComponent(texto);
-      const link = `https://wa.me/${numero}?text=${textoCodificado}`;
-      statusLink.innerHTML = `<a href="${link}" target="_blank">${link}</a>`;
-    });
-  }
-
-  // Scripts específicos de páginas futuras podem ir aqui:
-    // Scripts específicos de páginas futuras podem ir aqui:
-    let isRestarting = false;
-let isLoggingOut = false;
-let intervalId = null;
-
+// --- STATUS DO WHATSAPP E QR CODE ---
 if (document.getElementById('qrcode')) {
   const qrcodeImg = document.getElementById('qrcode');
   const title = document.getElementById('title');
@@ -555,29 +194,31 @@ if (document.getElementById('qrcode')) {
   const loading = document.getElementById('loading');
   const statusText = document.getElementById('status');
 
+  let intervalId = null;
+  let isRestarting = false;
+  let isLoggingOut = false;
+
   async function checkStatus() {
+    if (!userId) return; // só tenta se userId disponível
     try {
-      const res = await fetch('https://atentus.com.br:5030/status');
+      const res = await fetch(`https://atentus.com.br:5030/status/${userId}`);
       const data = await res.json();
 
-      if (data.connected) {
+      if (data.conectado) {
         qrcodeImg.style.display = 'none';
         loading.style.display = 'none';
         title.textContent = '✅ Conectado com Sucesso!';
         subtitle.textContent = 'Você já pode fechar esta página.';
 
-        // Libera exibição normal novamente
         if (isRestarting || isLoggingOut) {
           statusText.textContent = '✅ Conectado com sucesso!';
         } else {
           statusText.textContent = '';
         }
 
-        // Reset flags e reativa o checkStatus se estiver pausado
         isRestarting = false;
         isLoggingOut = false;
         restartCheckStatusInterval();
-
       } else {
         if (data.qr) {
           qrcodeImg.src = data.qr;
@@ -615,26 +256,17 @@ if (document.getElementById('qrcode')) {
   async function restartBot() {
     stopCheckStatusInterval();
     isRestarting = true;
-    statusText.textContent = "♻️ Reiniciando, aguarde por favor...";
+    statusText.textContent = '♻️ Reiniciando, aguarde por favor...';
     loading.style.display = 'block';
 
     try {
       const res = await fetch('https://atentus.com.br:5030/restart', { method: 'POST' });
       const data = await res.json();
-
-      if (data.message) {
-        statusText.textContent = data.message;
-        title.textContent = '✅ Reiniciado com sucesso!';
-        
-      } else {
-        statusText.textContent = "Reiniciando, aguarde até a confirmação...";
-      }
-
-      // Reativa monitoramento após delay pequeno
+      statusText.textContent = data.message || 'Reiniciado com sucesso!';
+      title.textContent = '✅ Reiniciado com sucesso!';
       setTimeout(() => startCheckStatusInterval(), 3000);
-
     } catch (error) {
-      statusText.textContent = "Erro ao reiniciar...";
+      statusText.textContent = 'Erro ao reiniciar...';
       loading.style.display = 'none';
       console.error(error);
       isRestarting = false;
@@ -645,20 +277,17 @@ if (document.getElementById('qrcode')) {
   async function logoutBot() {
     stopCheckStatusInterval();
     isLoggingOut = true;
-    statusText.textContent = "🚪 Desconectando, aguarde...";
+    statusText.textContent = '🚪 Desconectando, aguarde...';
     loading.style.display = 'block';
 
     try {
       const res = await fetch('https://atentus.com.br:5030/logout', { method: 'POST' });
       const data = await res.json();
-      statusText.textContent = data.message;
+      statusText.textContent = data.message || 'Desconectado!';
       title.textContent = '❎ Desconectado!';
-
-      // Reativa verificação depois de um tempo
       setTimeout(() => startCheckStatusInterval(), 3000);
-
     } catch (error) {
-      statusText.textContent = "Erro ao desconectar...";
+      statusText.textContent = 'Erro ao desconectar...';
       loading.style.display = 'none';
       console.error(error);
       isLoggingOut = false;
@@ -669,7 +298,6 @@ if (document.getElementById('qrcode')) {
   // Botões
   const btnReconnect = document.getElementById('reconnect');
   const btnLogout = document.getElementById('logout');
-
   if (btnReconnect) btnReconnect.addEventListener('click', restartBot);
   if (btnLogout) btnLogout.addEventListener('click', logoutBot);
 
@@ -678,12 +306,11 @@ if (document.getElementById('qrcode')) {
   startCheckStatusInterval();
 }
 
-// ⏰ Horários (incluir dentro da função inicializarElementosPagina)
+// --- GERENCIAMENTO DE HORÁRIOS ---
 const selects = [
   'chooseHours1', 'chooseHours2', 'chooseHours3',
   'chooseHours4', 'chooseHours5', 'chooseHours6'
 ];
-
 const statusEl = document.getElementById('statushorarios');
 const listaEl = document.getElementById('horarios_escolhidos');
 const btnConfirmar = document.getElementById('confirmar_horas');
@@ -691,26 +318,34 @@ const btnConfirmar = document.getElementById('confirmar_horas');
 if (btnConfirmar && listaEl && statusEl) {
   const textoOriginalBotao = btnConfirmar.innerText;
 
-  function carregarHorarios() {
-    fetch('https://atentus.com.br:5030/horarios')
-      .then(res => res.json())
-      .then(data => {
-        const lista = data.horarios || [];
-        const horariosOriginais = lista.map(h => (h - 3 + 24) % 24);
-        listaEl.innerText = horariosOriginais.map(h => `${h}:00`).join(' | ');
-      })
-      .catch(() => {
-        listaEl.innerText = 'Erro ao carregar horários';
-      });
+  // CARREGAR HORÁRIOS - backend não tem GET /horarios?userId, então aqui fica vazio ou adaptar backend
+  async function carregarHorarios() {
+    if (!userId) return;
+    try {
+      // Supondo que você crie rota GET /horarios?userId=...
+      const res = await fetch(`https://atentus.com.br:5030/horarios?userId=${encodeURIComponent(userId)}`);
+      const data = await res.json();
+      const lista = data.horarios || [];
+      // Ajusta para hora original com fuso
+      const horariosOriginais = lista.map(h => (h - 3 + 24) % 24);
+      listaEl.innerText = horariosOriginais.map(h => `${h}:00`).join(' | ');
+    } catch {
+      listaEl.innerText = 'Erro ao carregar horários';
+    }
   }
 
-  btnConfirmar.addEventListener('click', () => {
+  btnConfirmar.addEventListener('click', async () => {
+    if (!userId) {
+      statusEl.innerText = 'Usuário não autenticado';
+      return;
+    }
+
     const valores = selects.map(id => {
       const el = document.getElementById(id);
       return el ? el.value : null;
     }).filter(v => v !== 'null' && v !== null);
 
-    const unicos = [...new Set(valores.map(Number))].sort((a, b) => a - b);
+    const unicos = [...new Set(valores.map(Number))].sort((a,b) => a-b);
 
     if (unicos.length === 0) {
       statusEl.innerText = '⚠️ Selecione pelo menos um horário';
@@ -720,41 +355,43 @@ if (btnConfirmar && listaEl && statusEl) {
     btnConfirmar.disabled = true;
     btnConfirmar.innerText = 'Salvando...';
 
-    fetch('https://atentus.com.br:5030/horarios', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ horarios: unicos })
-    })
-      .then(res => res.json())
-      .then(data => {
-        statusEl.innerText = '✅ Horários salvos com sucesso!';
-        listaEl.innerText = data.horarios.map(h => `${h}:00`).join(' | ');
-      })
-      .catch(() => {
-        statusEl.innerText = '❌ Erro ao salvar os horários';
-      })
-      .finally(() => {
-        btnConfirmar.disabled = false;
-        btnConfirmar.innerText = textoOriginalBotao;
+    try {
+      const res = await fetch('https://atentus.com.br:5030/horarios', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, horarios: unicos }),
       });
+      const data = await res.json();
+      statusEl.innerText = data.message || '✅ Horários salvos com sucesso!';
+      if(data.horarios) {
+        listaEl.innerText = data.horarios.map(h => `${h}:00`).join(' | ');
+      }
+    } catch {
+      statusEl.innerText = '❌ Erro ao salvar os horários';
+    } finally {
+      btnConfirmar.disabled = false;
+      btnConfirmar.innerText = textoOriginalBotao;
+    }
   });
 
   carregarHorarios();
 }
 
-if (document.getElementById('confirmar_grupos')) {
-  const tabelaEsquerda = document.getElementById('tabela_grupos_esquerda');
-  const tabelaDireita = document.getElementById('tabela_grupos_direita');
-  const btnConfirmarGrupos = document.getElementById('confirmar_grupos');
+// --- GRUPOS ---
+const tabelaEsquerda = document.getElementById('tabela_grupos_esquerda');
+const tabelaDireita = document.getElementById('tabela_grupos_direita');
+const btnConfirmarGrupos = document.getElementById('confirmar_grupos');
 
-  // Limpa quaisquer linhas existentes
+if (btnConfirmarGrupos && tabelaEsquerda && tabelaDireita) {
   tabelaEsquerda.innerHTML = '';
   tabelaDireita.innerHTML = '';
 
-  // Busca os grupos do backend
-  fetch('https://atentus.com.br:5030/grupos')
-    .then(res => res.json())
-    .then(grupos => {
+  async function carregarGrupos() {
+    if (!userId) return;
+    try {
+      const res = await fetch(`https://atentus.com.br:5030/grupos?userId=${encodeURIComponent(userId)}`);
+      const grupos = await res.json();
+
       grupos.forEach(grupo => {
         const tr = document.createElement('tr');
 
@@ -762,7 +399,7 @@ if (document.getElementById('confirmar_grupos')) {
         let nomeParte = '';
 
         if (grupo.id.includes(' - ')) {
-        [idParte, nomeParte] = grupo.id.split(' - ');
+          [idParte, nomeParte] = grupo.id.split(' - ');
         }
 
         const tdId = document.createElement('td');
@@ -783,10 +420,11 @@ if (document.getElementById('confirmar_grupos')) {
         tr.appendChild(tdCheck);
 
         tabelaEsquerda.appendChild(tr);
-        
-        //setInterval(tr, 3000);
       });
-    });
+    } catch (error) {
+      console.error('Erro ao carregar grupos:', error);
+    }
+  }
 
   function atualizarGruposSelecionados() {
     tabelaDireita.innerHTML = '';
@@ -811,236 +449,168 @@ if (document.getElementById('confirmar_grupos')) {
     });
   }
 
-  btnConfirmarGrupos.addEventListener('click', () => {
-    const linhasSelecionadas = tabelaDireita.querySelectorAll('tr');
+  btnConfirmarGrupos.addEventListener('click', async () => {
+    if (!userId) return;
+
     const status = document.getElementById('status_grupos');
+    const linhasSelecionadas = tabelaDireita.querySelectorAll('tr');
     const gruposSelecionados = Array.from(linhasSelecionadas).map(tr => ({
       id: tr.children[0].textContent,
       nome: tr.children[1].textContent
     }));
 
-    fetch('https://atentus.com.br:5030/grupos', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(gruposSelecionados)
-    })
-      .then(res => res.json())
-      .then(data => {
-        //alert(data.message);
-        status.textContent = data.message;
-      })
-      .catch(err => {
-        //alert('Erro ao salvar os grupos');
-        status.textContent = 'Erro ao salvar os grupos';
-        console.error(err);
+    try {
+      const res = await fetch('https://atentus.com.br:5030/grupos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, gruposSelecionados })
       });
+      const data = await res.json();
+      status.textContent = data.message || 'Grupos salvos com sucesso';
+    } catch (err) {
+      status.textContent = 'Erro ao salvar os grupos';
+      console.error(err);
+    }
+  });
+
+  carregarGrupos();
+}
+
+// --- ANÚNCIOS PREVIEW ---
+const selectDia = document.getElementById('diaSemana_chk');
+const imagem = document.getElementById('previewImagem_chk');
+const texto = document.getElementById('previewText_chk');
+
+if (selectDia && imagem && texto) {
+  async function carregarPreview(dia) {
+    try {
+      const res = await fetch(`https://atentus.com.br:5030/anuncio/${encodeURIComponent(dia)}?userId=${encodeURIComponent(userId)}`);
+      const data = await res.json();
+      imagem.src = data.imagemBase64 || 'default_preview.jpg';
+      texto.innerHTML = (data.texto || '').replace(/\n/g, '<br>');
+    } catch (err) {
+      console.error('Erro ao carregar anúncio:', err);
+      imagem.src = 'default_preview.jpg';
+      texto.textContent = '';
+    }
+  }
+
+  carregarPreview(selectDia.value);
+
+  selectDia.addEventListener('change', () => {
+    carregarPreview(selectDia.value);
   });
 }
 
-//meusanuncios
-if (document.getElementById('tabela_grupos_check')) {
-  fetch('https://atentus.com.br:5030/gruposcheck')
-    .then(res => res.json())
-    .then(grupos => {
-      const tbody = document.getElementById('tabela_grupos_check');
-      tbody.innerHTML = ''; // limpa antes de preencher (opcional)
-
-      grupos.forEach(grupo => {
-        const tr = document.createElement('tr');
-
-        const tdId = document.createElement('td');
-        tdId.textContent = grupo.id;
-
-        const tdNome = document.createElement('td');
-        tdNome.textContent = grupo.nome;
-
-        tr.appendChild(tdId);
-        tr.appendChild(tdNome);
-
-        tbody.appendChild(tr);
-      });
-    })
-    .catch(error => {
-      console.error('Erro ao carregar os grupos:', error);
-    });
-}
-if (document.getElementById('previewImagem_chk')) {
-  const selectDia = document.getElementById('diaSemana_chk');
-  const imagem = document.getElementById('previewImagem_chk');
-  const texto = document.getElementById('previewText_chk');
-
-  if (selectDia && imagem && texto) {
-    // Função para carregar prévia
-    const carregarPreview = (dia) => {
-      fetch(`https://atentus.com.br:5030/anuncio/${dia}`)
-        .then(res => res.json())
-        .then(data => {
-          // Se não há imagem ou está vazia, usa a default
-          imagem.src = data.imagemBase64 || 'default_preview.jpg';
-          texto.innerHTML = (data.texto || '').replace(/\n/g, '<br>');
-        })
-        .catch(err => {
-          console.error('Erro ao carregar anúncio:', err);
-          // Em caso de erro, também usa a imagem default
-          imagem.src = 'default_preview.jpg';
-          texto.textContent = '';
-        });
-    };
-
-    // Carrega a primeira vez
-    carregarPreview(selectDia.value);
-
-    // Atualiza ao mudar
-    selectDia.addEventListener('change', () => {
-      carregarPreview(selectDia.value);
-    });
-  }
-}
-
-//duplicar anuncios meusanuncios
-
-//document.addEventListener('DOMContentLoaded', () => {
-  
-  if (document.getElementById('confirmar_checkbox')) {
-    const btnConfirmar = document.getElementById('confirmar_checkbox');
-    btnConfirmar.addEventListener('click', () => {
-      const selectDia = document.getElementById('diaSemana_chk');
-      const diaOrigem = selectDia.value;
-      const statuschk = document.getElementById('status_checkbox');
-
-      // Pegar todos os checkboxes marcados
-      const checkboxes = document.querySelectorAll('.main__checkbox');
-      const diasDestino = [];
-
-      checkboxes.forEach(checkbox => {
-        if (checkbox.checked) {
-          // Extrair o dia do id, que está no formato checkbox_segunda, checkbox_terca, etc
-          const dia = checkbox.id.replace('checkbox_', '');
-          // Evita copiar para o mesmo dia origem
-          if (dia !== diaOrigem) diasDestino.push(dia);
-        }
-      });
-
-      if (diasDestino.length === 0) {
-        //alert('Selecione pelo menos um dia diferente para copiar o anúncio.');
-        statuschk.textContent = 'Selecione pelo menos um dia diferente para copiar o anúncio.';
-        return;
-      }
-
-      fetch('https://atentus.com.br:5030/copiar-anuncio', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ diaOrigem, diasDestino })
-      })
-      
-      .then(res => {
-        if (!res.ok) throw new Error('Erro ao copiar anúncio');
-        return res.text();
-      })
-      .then(msg => {
-        //alert(msg);
-        statuschk.textContent = msg;
-        // Opcional: desmarcar checkboxes após confirmação
-        checkboxes.forEach(c => c.checked = false);
-      })
-      .catch(err => {
-        console.error(err);
-        //alert('Erro ao copiar anúncio. Veja o console.');
-        statuschk.textContent = 'Erro ao copiar anúncio. Veja o console.';
-      });
-    });
-  //}
-};
-//Apagar anuncio
-if (document.getElementById('btn-apagar-anuncio')){
-  const btnApagarAnuncio = document.getElementById('btn-apagar-anuncio');
-  btnApagarAnuncio.addEventListener('click', async () => {
-  const diaSelecionado = document.getElementById('diaSemana_chk').value;
-  const statuschk = document.getElementById('status_checkbox');
-
-
-  if (!diaSelecionado) {
-    //alert('Por favor, selecione um dia.');
-    statuschk.textContent = 'Por favor, selecione um dia.';
-    return;
-  }
-
-  try {
-    const resposta = await fetch('https://atentus.com.br:5030/apagar-anuncio', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ dia: diaSelecionado })
-    });
-
-    const textoResposta = await resposta.text();
-    //alert(textoResposta);
-    statuschk.textContent = textoResposta;
-  } catch (error) {
-    console.error('Erro ao apagar anúncio:', error);
-    //alert('Erro ao tentar apagar o anúncio.');
-    statuschk.textContent = 'Erro ao tentar apagar o anúncio.';
-  }
-
-});
-};
-//Apagar todos
-if (document.getElementById('btn-apagar-todos')){
-  const btnApagarTodos = document.getElementById('btn-apagar-todos');
-  btnApagarTodos.addEventListener('click', async () => {
+// --- COPIAR ANÚNCIO ---
+const btnConfirmarCheckbox = document.getElementById('confirmar_checkbox');
+if (btnConfirmarCheckbox) {
+  btnConfirmarCheckbox.addEventListener('click', async () => {
+    if (!userId) return;
+    const selectDia = document.getElementById('diaSemana_chk');
+    const diaOrigem = selectDia.value;
     const statuschk = document.getElementById('status_checkbox');
-  if (!confirm('Tem certeza que deseja apagar todos os anúncios? Esta ação não pode ser desfeita!')) {
-    return;
-  }
 
-  try {
-    const resposta = await fetch('https://atentus.com.br:5030/apagar-todos-anuncios', {
-      method: 'POST'
+    const checkboxes = document.querySelectorAll('.main__checkbox');
+    const diasDestino = [];
+
+    checkboxes.forEach(checkbox => {
+      if (checkbox.checked) {
+        const dia = checkbox.id.replace('checkbox_', '');
+        if (dia !== diaOrigem) diasDestino.push(dia);
+      }
     });
 
-    const textoResposta = await resposta.text();
-    //alert(textoResposta);
-    statuschk.textContent = textoResposta;
-  } catch (error) {
-    console.error('Erro ao apagar todos os anúncios:', error);
-    //alert('Erro ao tentar apagar todos os anúncios.');
-    statuschk.textContent = 'Erro ao tentar apagar todos os anúncios.';
-  }
-});
-};
+    if (diasDestino.length === 0) {
+      statuschk.textContent = 'Selecione pelo menos um dia diferente para copiar o anúncio.';
+      return;
+    }
 
-
-  // if (main.innerHTML.includes("id_exclusivo_da_nova_pagina")) { ... }
-}
-
-// Configura os links do menu
-function getCurrentPage() {
-  const activeLink = document.querySelector('.nav-link.active');
-  return activeLink ? activeLink.getAttribute('data-page') : 'login';
-}
-
-// Função para inicializar a aplicação
-function inicializarApp() {
-  // Verificar se já está logado
-  if (verificarAutenticacao()) {
-    carregarPagina('anuncios');
-  } else {
-    carregarPagina('login');
-  }
-  
-  // Configurar event listeners para navegação
-  document.addEventListener('click', (e) => {
-    const link = e.target.closest('[data-page]');
-    if (link) {
-      e.preventDefault();
-      const pagina = link.getAttribute('data-page');
-      carregarPagina(pagina);
+    try {
+      const res = await fetch('https://atentus.com.br:5030/copiar-anuncio', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, diaOrigem, diasDestino })
+      });
+      if (!res.ok) throw new Error('Erro ao copiar anúncio');
+      const msg = await res.text();
+      statuschk.textContent = msg;
+      checkboxes.forEach(c => c.checked = false);
+    } catch (err) {
+      console.error(err);
+      statuschk.textContent = 'Erro ao copiar anúncio.';
     }
   });
 }
 
-// Inicializar quando o DOM estiver pronto
-document.addEventListener('DOMContentLoaded', () => {
-  inicializarApp();
-});
+// --- APAGAR ANÚNCIO ---
+const btnApagarAnuncio = document.getElementById('btn-apagar-anuncio');
+if (btnApagarAnuncio) {
+  btnApagarAnuncio.addEventListener('click', async () => {
+    if (!userId) return;
+    const diaSelecionado = document.getElementById('diaSemana_chk').value;
+    const statuschk = document.getElementById('status_checkbox');
+
+    if (!diaSelecionado) {
+      statuschk.textContent = 'Por favor, selecione um dia.';
+      return;
+    }
+
+    try {
+      const resposta = await fetch('https://atentus.com.br:5030/apagar-anuncio', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, dia: diaSelecionado })
+      });
+      const textoResposta = await resposta.text();
+      statuschk.textContent = textoResposta;
+    } catch (error) {
+      console.error('Erro ao apagar anúncio:', error);
+      statuschk.textContent = 'Erro ao tentar apagar o anúncio.';
+    }
+  });
+}
+
+// --- APAGAR TODOS ANÚNCIOS ---
+const btnApagarTodos = document.getElementById('btn-apagar-todos');
+if (btnApagarTodos) {
+  btnApagarTodos.addEventListener('click', async () => {
+    if (!userId) return;
+    const statuschk = document.getElementById('status_checkbox');
+
+    try {
+      const res = await fetch('https://atentus.com.br:5030/apagar-todos-anuncios', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId })
+      });
+      const msg = await res.text();
+      statuschk.textContent = msg;
+    } catch (err) {
+      console.error(err);
+      statuschk.textContent = 'Erro ao apagar todos os anúncios.';
+    }
+  });
+}
+
+// --- Função para inicializar app após login ---
+function inicializarApp() {
+  // Aqui pode colocar chamadas que precisam userId para já carregar dados
+  // Por exemplo, carregar grupos, horários, anúncios, etc.
+
+  // Exemplo: carregarHorarios();
+  // Exemplo: carregarGrupos();
+
+  // Se quiser, pode disparar eventos para atualizar UI, etc
+}
+
+// --- Função para trocar de página (se usar SPA simples) ---
+function carregarPagina(nomePagina) {
+  const paginas = document.querySelectorAll('.pagina');
+  paginas.forEach(p => p.style.display = 'none');
+  const paginaAtiva = document.getElementById(nomePagina);
+  if (paginaAtiva) paginaAtiva.style.display = 'block';
+}
+
+// Se você quiser, pode disparar inicializarApp() no carregamento se já estiver logado
+}
