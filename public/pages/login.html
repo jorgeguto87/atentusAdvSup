@@ -1,45 +1,9 @@
-
-<!DOCTYPE html>
-<html lang="pt-br">
-<head>
-  <meta charset="UTF-8">
-  <title>Login | Atentus AdvZap</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="stylesheet" href="../style.css">
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-</head>
-<body>
-  <div class="main__login__container">
-    <h2 class="main__titulo">Entrar</h2>
-    <p class="main__selection">Digite seu login e senha</p>
-    <input type="email" placeholder="Email" class="main__input" id="login">
-    <input type="password" placeholder="Senha" class="main__input" id="senha">
-    <button class="main__button" id="btnEntrar">Entrar</button>
-    <p class="main__selection">Ainda não possui cadastro? <a class="main__link" href="cadastro.html">Clique aqui!</a></p>
-    <label class="main__selection" id="statusLogin"></label>
-  </div>
-
-  <script>
-    const supabase = window.supabase.createClient(
-      'https://asoxpubkhrqoumcdizcp.supabase.co',
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFzb3hwdWJraHJxb3VtY2RpemNwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA4OTI3ODQsImV4cCI6MjA2NjQ2ODc4NH0.-RUTRABZMLa4HBWpu_20rILzbMxdZj3Kn6Jkmh5b7Zw'
-    );
-
-    document.getElementById("btnEntrar").addEventListener("click", async () => {
-      const email = document.getElementById("login").value;
-      const senha = document.getElementById("senha").value;
-      const status = document.getElementById("statusLogin");
-
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password: senha });
-
-      if (error) {
-        status.textContent = "Login inválido. Verifique os dados.";
-      } else {
-        localStorage.setItem("token", data.session.access_token);
-        localStorage.setItem("userId", data.user.id);
-        window.location.href = "../index.html";
-      }
-    });
-  </script>
-</body>
-</html>
+<div class="main__login__container">
+            <h2 class="main__titulo">Entrar</h2>
+            <p class="main__selection">Digite seu login e senha</p>
+            <input type="text" placeholder="Login" class="main__input" id="login">
+            <input type="password" placeholder="Senha" class="main__input" id="senha">
+            <button class="main__button" id="btnEntrar">Entrar</button>
+            <p class="main__selection">Ainda não possui cadastro? <a class="main__link" id="linkCadastro"  href="#">Clique aqui!</a></p>
+            <label class="main__selection" id="statusLogin"></label>
+        </div>
